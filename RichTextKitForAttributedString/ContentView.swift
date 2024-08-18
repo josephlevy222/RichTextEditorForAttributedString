@@ -14,7 +14,7 @@ import SwiftUI
 //	}
 //}
 struct ContentView: View {
-	@State var text = AttributedString("Type here please").setFont(to: .title.bold())//.nsAttributedString().attributedStringFromUIKit
+	@State var text = AttributedString("Type here please").setFont(to: .largeTitle.bold())
 	@State var frameWidth = 0.0
 	@State var frameHeight = 0.0
 	@State var fixedSizeHorizontal = false

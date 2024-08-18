@@ -20,6 +20,7 @@ public struct KeyboardToolbar  {
 	var textAlignment: NSTextAlignment = .center
     var color : Color = Color(uiColor: .label)
     var background: Color = Color(uiColor: .clear)
+	var sound: Bool = true
     
     var justChanged: Bool = false
 }
@@ -40,7 +41,7 @@ extension NSTextAlignment {
 
 enum KeyboardCommand : Identifiable {
 	case bold,italic,underline,strikethrough,superscript,subscripts,modifyFontSize,alignText,insertImage,selectColor,
-		 selectBackground,dismissKeyboard
+		 selectBackground,dismissKeyboard,clickSound
 	var id : String { String(describing: self)}
 }
 
@@ -108,6 +109,7 @@ public struct KeyboardAccessoryView: View {
 				HStack(spacing: 4) {
 					Button(action: increaseFontSize) { symbol("plus.circle") }
 					Text(String(format: "%.1f", toolbar.fontSize)).font(.body)
+						.onTapGesture { print("Font size tapped")}
 					Button(action: decreaseFontSize) { symbol("minus.circle") }
 				}
 				space(4)
@@ -130,13 +132,14 @@ public struct KeyboardAccessoryView: View {
 					Button(action: selectBackground) { symbol("a.square") } }
 				.fixedSize()
 				space(5)
+			case .clickSound:
+				Button(action: toggleSound) {symbol(toolbar.sound  ? "speaker" : "speaker.slash")}
 			case .dismissKeyboard:
 				Button(action: {
 					textView.resignFirstResponder()
 				}) { symbol("keyboard.chevron.compact.down")}
 					.padding(edgeInsets)
 			}
-			
 		}
 	}
 		
@@ -146,9 +149,9 @@ public struct KeyboardAccessoryView: View {
 		}
 	}
 	
-	let leadingButtons: [KeyboardCommand] = [.bold,.italic,.underline,.strikethrough,.superscript,.subscripts,.modifyFontSize,
-											 .selectColor,.selectBackground,.alignText]
-	let trailingButtons: [KeyboardCommand] = [.dismissKeyboard]
+	let leadingButtons: [KeyboardCommand] = [.bold,.italic,.underline,.strikethrough,.superscript,.subscripts,
+											 .modifyFontSize,.selectColor,.selectBackground,.alignText]
+	let trailingButtons: [KeyboardCommand] = [.clickSound,.dismissKeyboard]
     
 	public var body: some View {
 		HStack(spacing: 1) {
@@ -164,8 +167,10 @@ public struct KeyboardAccessoryView: View {
     var attributedText: NSAttributedString { textView.attributedText }
     var selectedRange: NSRange { textView.selectedRange }
     
+	func toggleSound() { toolbar.sound.toggle() }
+	
     func toggleStrikethrough() {
-		inputClick.play()
+		inputClick.play(!toolbar.sound)
         let attributedString = NSMutableAttributedString(attributedString: attributedText)
         if selectedRange.isEmpty {
             toolbar.isStrikethrough.toggle()
@@ -175,8 +180,7 @@ public struct KeyboardAccessoryView: View {
             return
         }
         var isAllStrikethrough = true
-        attributedString.enumerateAttribute(.strikethroughStyle,
-                                            in: selectedRange,
+        attributedString.enumerateAttribute(.strikethroughStyle, in: selectedRange,
                                             options: []) { (value, range, stopFlag) in
             let strikethrough = value as? NSNumber
             if strikethrough == nil {
@@ -193,7 +197,7 @@ public struct KeyboardAccessoryView: View {
     }
     
     func toggleUnderline() {
-		inputClick.play()
+		inputClick.play(!toolbar.sound)
         let attributedString = NSMutableAttributedString(attributedString: attributedText)
         if selectedRange.isEmpty {
             toolbar.isUnderline.toggle()
@@ -203,8 +207,7 @@ public struct KeyboardAccessoryView: View {
             return
         }
         var isAllUnderlined = true
-        attributedString.enumerateAttribute(.underlineStyle,
-                                            in: selectedRange,
+        attributedString.enumerateAttribute(.underlineStyle, in: selectedRange,
                                             options: []) { (value, range, stopFlag) in
             let underline = value as? NSNumber
             if  underline == nil  {
@@ -232,24 +235,12 @@ public struct KeyboardAccessoryView: View {
     }
 	
     private func toggleSymbolicTrait(_ trait: UIFontDescriptor.SymbolicTraits)  {
-		inputClick.play()
+		inputClick.play(!toolbar.sound)
         if selectedRange.isEmpty { // toggle typingAttributes
             toolbar.justChanged = true
             let uiFont = textView.typingAttributes[.font] as? UIFont
-            if let descriptor = uiFont?.fontDescriptor {
-                let isBold = descriptor.symbolicTraits.intersection(.traitBold) == .traitBold
-                let isTrait = descriptor.symbolicTraits.intersection(trait) == trait
-                // Fix bug in largeTitle by setting bold weight directly
-                var weight = isBold ? .bold : descriptor.weight
-                weight = trait != .traitBold ? weight : (isBold ? .regular : .bold)
-                if let fontDescriptor = isTrait ? descriptor.withSymbolicTraits(descriptor.symbolicTraits.subtracting(trait))
-                    : descriptor.withSymbolicTraits(descriptor.symbolicTraits.union(trait)) {
-                    textView.typingAttributes[.font] = UIFont(descriptor: fontDescriptor.withWeight(weight), 
-															  size: descriptor.pointSize)
-                }
-                if let didChangeSelection = textView.delegate?.textViewDidChangeSelection { didChangeSelection(textView) }
-			} 
-            
+			textView.typingAttributes[.font] = uiFont?.toggleSymbolicTrait(trait)
+			if let didChangeSelection = textView.delegate?.textViewDidChangeSelection { didChangeSelection(textView) }
         } else {
             let attributedString = NSMutableAttributedString(attributedString: attributedText)
             var isAll = true
@@ -257,26 +248,21 @@ public struct KeyboardAccessoryView: View {
                                                 options: []) { (value, range, stopFlag) in
                 let uiFont = value as? UIFont
                 if let descriptor = uiFont?.fontDescriptor {
-					let isTrait = (descriptor.symbolicTraits.intersection(trait) == trait)
-                    isAll = isAll && isTrait
+					let hasTrait = (descriptor.symbolicTraits.intersection(trait) == trait)
+                    isAll = isAll && hasTrait
                     if !isAll { stopFlag.pointee = true }
                 }
-            }
+            }  /// At this point isAll is true if the trait should be removed from the selection
+			/// For each run in selectedRange add trait if isAll false, subtract if true
             attributedString.enumerateAttribute(.font, in: selectedRange,
                                                 options: []) {(value, range, stopFlag) in
                 let uiFont = value as? UIFont
-                if  let descriptor = uiFont?.fontDescriptor {
-                    // Fix bug in largeTitle by setting bold weight directly
-                    var weight = descriptor.symbolicTraits.intersection(.traitBold) == .traitBold ? .bold : descriptor.weight
-                    weight = trait != .traitBold ? weight : (isAll ? .regular : .bold)
-                    if let fontDescriptor = isAll ? descriptor.withSymbolicTraits(descriptor.symbolicTraits.subtracting(trait))
-                        : descriptor.withSymbolicTraits(descriptor.symbolicTraits.union(trait)) {
-                        attributedString.addAttribute(.font, value: UIFont(descriptor: fontDescriptor.withWeight(weight),
-                                                                           size: descriptor.pointSize), range: range)
-                    }
-                }
+				if let uiFont = uiFont?.toggleSymbolicTrait(trait) {
+					print("symbol trait uiFont: \(uiFont)")
+					attributedString.addAttribute(.font, value: uiFont, range: range)
+				}
             }
-            updateAttributedText(with: attributedString)
+			updateAttributedText(with: attributedString)
         }
     }
     
@@ -291,7 +277,7 @@ public struct KeyboardAccessoryView: View {
     }
     
     private func toggleScript(sub: Bool = false) {
-		inputClick.play()
+		inputClick.play(!toolbar.sound)
         let selectedRange = textView.selectedRange
         let newOffset = sub ? -0.3 : 0.4
         let attributedString = NSMutableAttributedString(attributedString: attributedText)
@@ -345,8 +331,8 @@ public struct KeyboardAccessoryView: View {
                     newFont = UIFont(descriptor: descriptor, size: descriptor.pointSize/0.75)
                     attributedString.removeAttribute(.baselineOffset, range: range)
                     attributedString.removeAttribute(.font, range: range)
-                    if descriptor.symbolicTraits.intersection(.traitItalic) == .traitItalic, let font = newFont.italic() {
-                        newFont = font
+                    if font.contains(trait: .traitItalic)  {
+						newFont = newFont.italic() ?? newFont
                     }
                 } else { newFont = UIFont.preferredFont(forTextStyle: .body) }
                 attributedString.addAttribute(.font, value: newFont, range: range)
@@ -361,13 +347,13 @@ public struct KeyboardAccessoryView: View {
                 let descriptor: UIFontDescriptor
                 if let font = attributes[.font] as? UIFont {
                     let isBold = font.contains(trait: .traitBold)
-					descriptor = font.fontDescriptor
-						.withSymbolicTraits(font.fontDescriptor.symbolicTraits.union(.traitTightLeading)) ?? font.fontDescriptor
+					descriptor = font.fontDescriptor  /// Not sure why I had the line below
+					//.withSymbolicTraits(font.fontDescriptor.symbolicTraits.union(.traitTightLeading)) ?? font.fontDescriptor
                     attributedString.addAttribute(.baselineOffset, value: newOffset*descriptor.pointSize,
                                                   range: range)
                     newFont = UIFont(descriptor: descriptor, size: 0.75*descriptor.pointSize)
-                    if descriptor.symbolicTraits.intersection(.traitItalic) == .traitItalic, let font = newFont.italic() {
-                        newFont = isBold ? font.withWeight(.bold) : font
+                    if descriptor.symbolicTraits.contains(.traitItalic), let font = newFont.italic() {
+                        newFont = isBold ? (font.bold() ?? font) : font
                     }
                 } else { newFont = UIFont.preferredFont(forTextStyle: .body) }
                 attributedString.addAttribute(.font, value: newFont, range: range)
@@ -376,9 +362,8 @@ public struct KeyboardAccessoryView: View {
         updateAttributedText(with: attributedString)
     }
     
-    
     private func alignText() {
-		inputClick.play()
+		inputClick.play(!toolbar.sound)
 		toolbar.textAlignment = switch toolbar.textAlignment {
 			case .left: .center
 			case .center: .right
@@ -395,7 +380,7 @@ public struct KeyboardAccessoryView: View {
     
     /// Add text attribute to text view
     private func textEffect<T: Equatable>(range: NSRange, key: NSAttributedString.Key, value: T, defaultValue: T) {
-		inputClick.play()
+		inputClick.play(!toolbar.sound)
         if !range.isEmpty {
             let mutableString = NSMutableAttributedString(attributedString: textView.attributedText)
             mutableString.removeAttribute(key, range: range)
@@ -413,7 +398,7 @@ public struct KeyboardAccessoryView: View {
     }
     
     private func adjustFontSize(isIncrease: Bool) {
-		inputClick.play()
+		inputClick.play(!toolbar.sound)
         let textRange = textView.selectedRange
         var selectedRangeAttributes: [(NSRange, [NSAttributedString.Key : Any])] {
             var textAttributes: [(NSRange, [NSAttributedString.Key : Any])] = []
@@ -434,23 +419,19 @@ public struct KeyboardAccessoryView: View {
         if textRange.isEmpty {
             font = selectedRangeAttributes[0].1[.font] as? UIFont ?? defaultFont
             let offset = selectedRangeAttributes[0].1[.baselineOffset] as? CGFloat ?? 0.0
-            let weight = font.fontDescriptor.symbolicTraits.intersection(.traitBold) == .traitBold ? .bold : font
-				.fontDescriptor.weight
             let size = toolbar.fontSize
             let fontSize = Int(size + CGFloat(isIncrease ? (size < maxFontSize ? 1 : 0) : (size > minFontSize ? -1 : 0))+0.5)
             font = UIFont(descriptor: font.fontDescriptor, size: CGFloat(fontSize) * (offset == 0 ? 1.0 : 0.75) )
-				.withWeight(weight)
+
             textView.typingAttributes[.font] = font
             toolbar.fontSize = CGFloat(fontSize)
         } else {
             for (range, attributes) in rangesAttributes {
                 font = attributes[.font] as? UIFont ?? defaultFont
                 let offset = selectedRangeAttributes[0].1[.baselineOffset] as? CGFloat ?? 0.0
-                let weight = font.fontDescriptor.symbolicTraits.intersection(.traitBold) == .traitBold ? .bold : font.fontDescriptor.weight
                 let size = font.fontDescriptor.pointSize / (offset == 0 ? 1.0 : 0.75 )
                 let fontSize = Int(size + CGFloat(isIncrease ? (size<maxFontSize ? 1 : 0) : (size>minFontSize ? -1 : 0))+0.5)
                 font = UIFont(descriptor: font.fontDescriptor, size: CGFloat(fontSize) * (offset == 0 ? 1.0 : 0.75) )
-					.withWeight(weight)
                 textEffect(range: range, key: .font, value: font, defaultValue: defaultFont)
             }
         }
@@ -466,7 +447,7 @@ public struct KeyboardAccessoryView: View {
     }
     
     func insertImage() {
-		inputClick.play()
+		inputClick.play(!toolbar.sound)
 		let delegate = textView.delegate as? RichTextEditor.Coordinator
 		delegate?.insertImage()
     }
@@ -483,7 +464,7 @@ public struct KeyboardAccessoryView: View {
     }
 }
 
-struct KeyBoardAddition_Previews: PreviewProvider {
+struct KeyBoardAccessoryView_Previews: PreviewProvider {
     @State static var toolbar: KeyboardToolbar = .init(textView: RichTextView(), isUnderline: true)
     static var previews: some View {
         KeyboardAccessoryView(toolbar: .constant(toolbar))
@@ -502,7 +483,7 @@ public class InputClickPlayer {
 		} else { debugPrint("Error getting button click file sound56.wav") }
 	}
 	
-	public func play() { AudioServicesPlaySystemSound(soundID) }
+	public func play(_ mute: Bool) { if !mute { AudioServicesPlaySystemSound(soundID) } }
 }
 
 extension RichTextEditor.Coordinator : UIImagePickerControllerDelegate, UINavigationControllerDelegate {
@@ -642,56 +623,39 @@ extension RichTextEditor.Coordinator : UIImagePickerControllerDelegate, UINaviga
 	
 	// MARK: - Text View Delegate
 	func textViewDidChangeSelection(_ textView: UITextView) {
+		print("textViewDidChangeSelection")
 		let attributes = selectedAttributes
-		var updateFunc = {}
 		let richTextView = textView as? RichTextView
-		//let mutableString = NSMutableAttributedString(attributedString: textView.attributedText)
+		
 		let fontTraits: (isBold: Bool,isItalic: Bool,fontSize: CGFloat, offset: CGFloat) = {
 			let offset = attributes[.baselineOffset] as? CGFloat ?? 0.0
-			let pointSize: CGFloat
-			let traits = (attributes[.font] as? UIFont)?.fontDescriptor.symbolicTraits
-			let bold = traits?.intersection(.traitBold).contains(.traitBold) ?? false
-			let italic = traits?.intersection(.traitItalic).contains(.traitItalic) ?? false
+			var pointSize: CGFloat = UIFont.preferredFont(forTextStyle: .body).pointSize // default value
+			let uiFont = (attributes[.font] as? UIFont)//?.fontDescriptor.symbolicTraits
+			let bold = uiFont?.contains(trait: .traitBold) ?? false
+			let italic = uiFont?.contains(trait: .traitItalic) ?? false
 			
-			if let toolbar = richTextView?.toolbar, toolbar.wrappedValue.justChanged {
-				pointSize = toolbar.wrappedValue.fontSize
-				return ( bold, italic, pointSize, offset)
-			} else {
-				if let font=attributes[.font] as? UIFont {
-					pointSize = font.pointSize / (offset == 0.0 ? 1.0 : 0.75)
-					// pointSize is the fontSize that the toolbar ought to use unless justChanged
-					return (font.contains(trait: .traitBold),font.contains(trait: .traitItalic), pointSize, offset)
-				}
-				//print("Non UIFont may be Font in \(parent.textView.attributedText), try to convert...")
-				
+			if let toolbar = richTextView?.toolbar {
+				if toolbar.wrappedValue.justChanged {
+					pointSize = toolbar.wrappedValue.fontSize
+					print("bold: \(bold)")
+					return ( bold, italic, pointSize, offset)
+				} else {
+					if let uiFont {
+						pointSize = uiFont.pointSize / (offset == 0.0 ? 1.0 : 0.75)
+						// pointSize is the fontSize that the toolbar ought to use unless justChanged
+						let bold = uiFont.contains(trait: .traitBold)
+						print("bold didn't just change: \(bold)")
+						return (bold,uiFont.contains(trait: .traitItalic), pointSize, offset)
+					}
+				} // get here only if not justChanged and not uiFont
 				// Try to convert Font to UIFont
-				if let font = attributes[.font] as? Font { // { was ,
-					let uiFont = //UIFont(font: font, traitCollection: .current)
-					font.uiFont() ?? UIFont.preferredFont(forTextStyle: .body)
+				if let font = attributes[.font] as? Font { print("Font found.")// { was ,
+					let uiFont = font.uiFont() ?? UIFont.preferredFont(forTextStyle: .body)
 					pointSize = uiFont.pointSize / (offset == 0.0 ? 1.0 : 0.75)
+					let bold = uiFont.contains(trait: .traitBold); print("bold from Font: \(bold)")
 					// pointSize is the fontSize that the toolbar ought to use unless justChanged
-					return (uiFont.contains(trait: .traitBold),uiFont.contains(trait: .traitItalic), pointSize, offset)
-				}
-				pointSize = UIFont.preferredFont(forTextStyle: .body).pointSize
-				print("Non UIFont in fontTraits default pointSize is \(pointSize)")
-				
-				// Fix font
-				let mutableString = NSMutableAttributedString(attributedString: textView.attributedText)
-				var font: UIFont
-				let defaultFont = UIFont.preferredFont(forTextStyle: .body)
-				//let selection = textView.selectedRange
-				//textView.selectedRange = NSRange(location: 0,length: textView.attributedText.length)
-				let rangesAttributes = selectedRangeAttributes
-				for (range, attributes) in rangesAttributes {
-					font = attributes[.font] as? UIFont ?? defaultFont
-					let weight = font.fontDescriptor.symbolicTraits.intersection(.traitBold) == .traitBold
-					? .bold : font.fontDescriptor.weight
-					let size = font.fontDescriptor.pointSize
-					font = UIFont(descriptor: font.fontDescriptor, size: size).withWeight(weight)
-					mutableString.removeAttribute(.font, range: range)
-					mutableString.addAttributes([.font : font], range: range)
-				}
-				updateFunc = {(textView as? RichTextView)?.updateAttributedText(with: mutableString)}
+					return (bold,uiFont.contains(trait: .traitItalic), pointSize, offset)
+				} // Failed to Convert use .body
 			}
 			return ( false, false, pointSize, offset)
 		}()
@@ -735,6 +699,7 @@ extension RichTextEditor.Coordinator : UIImagePickerControllerDelegate, UINaviga
 		}
 		DispatchQueue.main.async {
 			guard let toolbar = richTextView?.toolbar else {  return }
+
 			toolbar.wrappedValue.fontSize = fontTraits.fontSize
 			toolbar.wrappedValue.isBold = fontTraits.isBold
 			toolbar.wrappedValue.isItalic = fontTraits.isItalic
@@ -747,119 +712,25 @@ extension RichTextEditor.Coordinator : UIImagePickerControllerDelegate, UINaviga
 			toolbar.wrappedValue.background = Color(uiColor: background)
 			toolbar.wrappedValue.justChanged = false
 			toolbar.wrappedValue.textAlignment = textView.textAlignment
-			updateFunc()
+
 		}
 	}
-	
 }
-//	func textViewDidChangeSelection1(_ textView: UITextView) {
-//		print("text did change selection")
-//		let attributes = selectedAttributes
-//		let richTextView = textView as? RichTextView
-//		let fontTraits: (isBold: Bool,isItalic: Bool,fontSize: CGFloat, offset: CGFloat) = {
-//			let offset = attributes[.baselineOffset] as? CGFloat ?? 0.0
-//			let pointSize: CGFloat
-//			let traits = (attributes[.font] as? UIFont)?.fontDescriptor.symbolicTraits
-//			let bold = traits?.intersection(.traitBold).contains(.traitBold) ?? false
-//			let italic = traits?.intersection(.traitItalic).contains(.traitItalic) ?? false
-//			if let toolbar = richTextView?.toolbar, toolbar.wrappedValue.justChanged {
-//				pointSize = toolbar.wrappedValue.fontSize
-//				return ( bold, italic, pointSize, offset)
-//			} else {
-//				if let font=attributes[.font] as? UIFont {
-//					pointSize = font.pointSize / (offset == 0.0 ? 1.0 : 0.75)
-//					// pointSize is the fontSize that the toolbar ought to use unless justChanged
-//					return (font.contains(trait: .traitBold),font.contains(trait: .traitItalic), pointSize, offset)
-//				}
-//				print("Non UIFont may be Font in \(parent.attributedText), try to convert...")
-//				// Try to convert Font to UIFont
-//				if let font = attributes[.font] as? Font,
-//				   let uiFont = font.uiFont() {
-//					pointSize = uiFont.pointSize / (offset == 0.0 ? 1.0 : 0.75)
-//					// pointSize is the fontSize that the toolbar ought to use unless justChanged
-//					return (uiFont.contains(trait: .traitBold),uiFont.contains(trait: .traitItalic), pointSize, offset)
-//				}
-//				pointSize = UIFont.preferredFont(forTextStyle: .body).pointSize
-//				print("Non UIFont in fontTraits default pointSize is \(pointSize)")
-//				
-//				// Fix font
-//				DispatchQueue.main.async {
-//					let mutableString = NSMutableAttributedString(attributedString: textView.attributedText)
-//					var font: UIFont
-//					let defaultFont = UIFont.preferredFont(forTextStyle: .body)
-//					let selection = textView.selectedRange
-//					textView.selectedRange = NSRange(location: 0,length: textView.attributedText.length)
-//					let rangesAttributes = self.selectedRangeAttributes
-//					for (range, attributes) in rangesAttributes {
-//						font = attributes[.font] as? UIFont ?? defaultFont
-//						let weight = font.fontDescriptor.symbolicTraits.intersection(.traitBold) == .traitBold
-//						? .bold : font.fontDescriptor.weight
-//						let size = font.fontDescriptor.pointSize
-//						font = UIFont(descriptor: font.fontDescriptor, size: size).withWeight(weight)
-//						mutableString.removeAttribute(.font, range: range)
-//						mutableString.addAttributes([.font : font], range: range)
-//					}
-//					(textView as? RichTextView)?.updateAttributedText(with: mutableString)
-//					textView.selectedRange = selection ; print("selectedRange = \(selection)")
-//				}
-//			}
-//			return ( false, false, pointSize, offset)
-//		}()
-//		
-//		var isUnderline: Bool {
-//			guard let toolbar = richTextView?.toolbar else { return false }
-//			return toolbar.wrappedValue.justChanged ? toolbar.wrappedValue.isUnderline : {
-//				if let style = attributes[.underlineStyle] as? Int {
-//					return style == NSUnderlineStyle.single.rawValue // or true
-//				} else {
-//					return false
-//				}
-//			}()
-//		}
-//		
-//		var isStrikethrough: Bool {
-//			guard let toolbar = richTextView?.toolbar else { return false }
-//			return toolbar.wrappedValue.justChanged ? toolbar.wrappedValue.isStrikethrough : {
-//				if let style = attributes[.strikethroughStyle] as? Int {
-//					return style == NSUnderlineStyle.single.rawValue
-//				} else {
-//					return false
-//				}
-//			}()
-//		}
-//		
-//		var isScript: (sub: Bool,super: Bool) {
-//			guard let toolbar = richTextView?.toolbar else { return (false, false) }
-//			return toolbar.wrappedValue.justChanged
-//			? (toolbar.wrappedValue.isSubscript, toolbar.wrappedValue.isSuperscript)
-//			: (fontTraits.offset < 0.0, fontTraits.offset > 0.0)
-//		}
-//		
-//		var color: UIColor { selectedAttributes[.foregroundColor] as? UIColor ?? UIColor.label }
-//		var background: UIColor  { selectedAttributes[.backgroundColor] as? UIColor ?? UIColor.systemBackground }
-//		
-//		if let color = parent.textView.typingAttributes[.backgroundColor] as? UIColor, color.luminance < 0.55 {
-//			textView.tintColor =  .cyan
-//		} else {
-//			textView.tintColor = .tintColor
-//		}
-//		DispatchQueue.main.async { //[self] in
-//			guard let toolbar = richTextView?.toolbar else {  return }
-//			toolbar.wrappedValue.fontSize = fontTraits.fontSize
-//			toolbar.wrappedValue.isBold = fontTraits.isBold
-//			toolbar.wrappedValue.isItalic = fontTraits.isItalic
-//			toolbar.wrappedValue.isUnderline = isUnderline
-//			toolbar.wrappedValue.isStrikethrough = isStrikethrough
-//			let script = isScript
-//			toolbar.wrappedValue.isSuperscript = script.1 //isSuperscript
-//			toolbar.wrappedValue.isSubscript = script.0 //isSubscript
-//			toolbar.wrappedValue.color = Color(uiColor: color)
-//			toolbar.wrappedValue.background = Color(uiColor: background)
-//			toolbar.wrappedValue.justChanged = false
-//			toolbar.wrappedValue.textAlignment = textView.textAlignment
-//		}
-//	}
-	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 //	func textViewDidBeginEditing(_ textView: UITextView) {
 //		if textView.attributedText.string == parent.placeholder {
 //			textView.attributedText = NSAttributedString(string: "")

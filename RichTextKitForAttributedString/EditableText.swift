@@ -13,11 +13,12 @@ struct EditableText: View {
 	@FocusState private var focus : Bool
 	var body: some View {
 		VStack {
+			let editor = RichTextEditor(attributedText: $text)
 			Text(text)
 				.opacity(focus ? 0 : 1)
 				.onTapGesture { focus = true }
 				.overlay {
-					RichTextEditor(attributedText: $text)
+					editor
 						.focused($focus)
 						.opacity(focus ? 1 : 0)
 				}

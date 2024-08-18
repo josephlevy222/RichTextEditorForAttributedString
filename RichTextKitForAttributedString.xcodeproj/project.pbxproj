@@ -11,7 +11,6 @@
 		37E05F972C542E3100265843 /* CustomizePopoverMenus.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37E05F962C542E3100265843 /* CustomizePopoverMenus.swift */; };
 		37E05F992C583ECD00265843 /* RichTextEditor.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37E05F982C583ECC00265843 /* RichTextEditor.swift */; };
 		37E05F9B2C584BAB00265843 /* Extensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37E05F9A2C584BAB00265843 /* Extensions.swift */; };
-		37E05F9F2C5C9D9500265843 /* AttributedText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37E05F9E2C5C9D9400265843 /* AttributedText.swift */; };
 		37E05FBE2C658E3B00265843 /* KeyboardAccessoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37E05FBD2C658E3A00265843 /* KeyboardAccessoryView.swift */; };
 		37E05FC02C65910B00265843 /* sound56.wav in Resources */ = {isa = PBXBuildFile; fileRef = 37E05FBF2C65910A00265843 /* sound56.wav */; };
 		37F383AE2C46DB06004DDCEA /* RichTextKitForAttributedStringApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37F383AD2C46DB06004DDCEA /* RichTextKitForAttributedStringApp.swift */; };
@@ -26,7 +25,6 @@
 		37E05F962C542E3100265843 /* CustomizePopoverMenus.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CustomizePopoverMenus.swift; sourceTree = "<group>"; };
 		37E05F982C583ECC00265843 /* RichTextEditor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RichTextEditor.swift; sourceTree = "<group>"; };
 		37E05F9A2C584BAB00265843 /* Extensions.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = Extensions.swift; sourceTree = "<group>"; };
-		37E05F9E2C5C9D9400265843 /* AttributedText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AttributedText.swift; sourceTree = "<group>"; };
 		37E05FBD2C658E3A00265843 /* KeyboardAccessoryView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = KeyboardAccessoryView.swift; sourceTree = "<group>"; };
 		37E05FBF2C65910A00265843 /* sound56.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = sound56.wav; sourceTree = "<group>"; };
 		37F383AA2C46DB06004DDCEA /* RichTextKitForAttributedString.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = RichTextKitForAttributedString.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -72,7 +70,6 @@
 				37F383AF2C46DB06004DDCEA /* ContentView.swift */,
 				37E05F982C583ECC00265843 /* RichTextEditor.swift */,
 				37E05FBD2C658E3A00265843 /* KeyboardAccessoryView.swift */,
-				37E05F9E2C5C9D9400265843 /* AttributedText.swift */,
 				37E05F962C542E3100265843 /* CustomizePopoverMenus.swift */,
 				37F383B12C46DB0B004DDCEA /* Assets.xcassets */,
 				37F383B32C46DB0B004DDCEA /* RichTextKitForAttributedString.entitlements */,
@@ -173,7 +170,6 @@
 				37F383B02C46DB06004DDCEA /* ContentView.swift in Sources */,
 				37E05F972C542E3100265843 /* CustomizePopoverMenus.swift in Sources */,
 				37E05F992C583ECD00265843 /* RichTextEditor.swift in Sources */,
-				37E05F9F2C5C9D9500265843 /* AttributedText.swift in Sources */,
 				3789AD192C52C4A900FC8D1E /* LNFontUtils.swift in Sources */,
 				37F383AE2C46DB06004DDCEA /* RichTextKitForAttributedStringApp.swift in Sources */,
 				37E05F9B2C584BAB00265843 /* Extensions.swift in Sources */,

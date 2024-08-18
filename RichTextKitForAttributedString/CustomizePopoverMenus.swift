@@ -5,9 +5,11 @@
 //  Created by Joseph Levy on 7/26/24.
 //
 
-import UIKit
+import SwiftUI
 
 extension RichTextView {
+	var toolbar: Binding<KeyboardToolbar>? { accessoryView?.$toolbar }
+	
 	open override func canPerformAction(_ action: Selector, withSender sender: Any? ) -> Bool {
 		if action.description.contains("_share")
 			|| action.description.contains("_translate")
