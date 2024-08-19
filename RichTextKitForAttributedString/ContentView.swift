@@ -6,13 +6,7 @@
 //
 
 import SwiftUI
-//extension AttributedString {
-//	public func setFont(to: Font) -> AttributedString {
-//		var a = self
-//		a.font = to
-//		return a
-//	}
-//}
+
 struct ContentView: View {
 	@State var text = AttributedString("Type here please").setFont(to: .largeTitle.bold())
 	@State var frameWidth = 0.0
@@ -33,6 +27,7 @@ struct ContentView: View {
 				.fixedSize(horizontal: fixedSizeHorizontal, vertical: fixedSizeVertical)
 				.frame(width: frameWidth == 0 ? nil : frameWidth, height: frameHeight == 0 ? nil : frameHeight)
 				.border(Color.green)
+			EditableText(text: $text)
 			Spacer()
 			Button("Done") { UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder),to: nil, from: nil, for: nil) }
 			Button("Reset") { text = AttributedString("Reset typing here...")}

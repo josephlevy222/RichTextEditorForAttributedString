@@ -36,6 +36,16 @@ extension NSTextAlignment {
 		@unknown default: "text.aligncenter"
 		}
 	}
+	var textAlignment: TextAlignment {
+			switch self {
+			case .left: .leading
+			case .center: .center
+			case .right: .trailing
+			case .justified: .leading
+			case .natural: .center
+			@unknown default: .center
+			}
+		}
 	static let available: [NSTextAlignment] = [.left, .right, .center]
 }
 
@@ -255,11 +265,18 @@ public struct KeyboardAccessoryView: View {
             }  /// At this point isAll is true if the trait should be removed from the selection
 			/// For each run in selectedRange add trait if isAll false, subtract if true
             attributedString.enumerateAttribute(.font, in: selectedRange,
-                                                options: []) {(value, range, stopFlag) in
-                let uiFont = value as? UIFont
-				if let uiFont = uiFont?.toggleSymbolicTrait(trait) {
-					print("symbol trait uiFont: \(uiFont)")
-					attributedString.addAttribute(.font, value: uiFont, range: range)
+												options: []) {(value, range, stopFlag) in
+				if isAll {
+					let uiFont = value as? UIFont
+					if let uiFont = uiFont?.toggleSymbolicTrait(trait) {
+						print("symbol trait uiFont: \(uiFont)")
+						attributedString.addAttribute(.font, value: uiFont, range: range)
+					}
+				} else {
+					let uiFont = value as? UIFont
+					if let uiFont, !uiFont.contains(trait: trait) {
+						attributedString.addAttribute(.font, value: uiFont.toggleSymbolicTrait(trait), range: range)
+					}
 				}
             }
 			updateAttributedText(with: attributedString)
@@ -598,16 +615,22 @@ extension RichTextEditor.Coordinator : UIImagePickerControllerDelegate, UINaviga
 	}
 	
 	var selectedAttributes: [NSAttributedString.Key : Any] {
-		let textRange = parent.textView.selectedRange
+		var textRange = parent.textView.selectedRange
+		var range = textRange
 		var textAttributes = parent.textView.typingAttributes
+		if textRange == NSRange() && parent.attributedText.characters.count != 0 {
+			range = NSMakeRange(0, 1)
+			parent.textView.selectedRange = textRange
+		}
 		if !textRange.isEmpty {
-			//textAttributes = [:] // Uncomment to avoid system putting values in typingAttributes
-			parent.textView.attributedText.enumerateAttributes(in: textRange) { attributes, range, stop in
+			parent.textView.attributedText.enumerateAttributes(in: range) { attributes, range, stop in
 				for item in attributes {
 					textAttributes[item.key] = item.value
 				}
 			}
 		}
+		parent.textView.selectedRange = textRange
+		print("test for font")
 		return textAttributes
 	}
 	
@@ -637,15 +660,12 @@ extension RichTextEditor.Coordinator : UIImagePickerControllerDelegate, UINaviga
 			if let toolbar = richTextView?.toolbar {
 				if toolbar.wrappedValue.justChanged {
 					pointSize = toolbar.wrappedValue.fontSize
-					print("bold: \(bold)")
 					return ( bold, italic, pointSize, offset)
 				} else {
 					if let uiFont {
 						pointSize = uiFont.pointSize / (offset == 0.0 ? 1.0 : 0.75)
 						// pointSize is the fontSize that the toolbar ought to use unless justChanged
-						let bold = uiFont.contains(trait: .traitBold)
-						print("bold didn't just change: \(bold)")
-						return (bold,uiFont.contains(trait: .traitItalic), pointSize, offset)
+						return (uiFont.contains(trait: .traitBold),uiFont.contains(trait: .traitItalic), pointSize, offset)
 					}
 				} // get here only if not justChanged and not uiFont
 				// Try to convert Font to UIFont
@@ -697,9 +717,10 @@ extension RichTextEditor.Coordinator : UIImagePickerControllerDelegate, UINaviga
 		} else {
 			textView.tintColor = .tintColor
 		}
+		self.parent.alignment = textView.textAlignment.textAlignment
 		DispatchQueue.main.async {
 			guard let toolbar = richTextView?.toolbar else {  return }
-
+			
 			toolbar.wrappedValue.fontSize = fontTraits.fontSize
 			toolbar.wrappedValue.isBold = fontTraits.isBold
 			toolbar.wrappedValue.isItalic = fontTraits.isItalic
@@ -712,56 +733,36 @@ extension RichTextEditor.Coordinator : UIImagePickerControllerDelegate, UINaviga
 			toolbar.wrappedValue.background = Color(uiColor: background)
 			toolbar.wrappedValue.justChanged = false
 			toolbar.wrappedValue.textAlignment = textView.textAlignment
+			
+			
+		}
+	}
+	func textViewDidEndEditing(_ textView: UITextView) {
+		//			if textView.attributedText.string == "" || textView.attributedText.string == parent.placeholder {
+		//				textView.attributedText = NSAttributedString(string: parent.placeholder)
+		//			} else {
+		//				parent.onCommit(textView.attributedText)
+		//			}
+		UITextView.appearance().tintColor = .tintColor
+		self.parent.alignment = textView.textAlignment.textAlignment
+	}
 
+	func textViewDidBeginEditing(_ textView: UITextView) {
+		//		if textView.attributedText.string == parent.placeholder {
+		//			textView.attributedText = NSAttributedString(string: "")
+		//			textView.typingAttributes[.foregroundColor] = UIColor.label
+		//		}
+		//		textView.undoManager?.registerUndo(withTarget: self, handler: { targetSelf in
+		//			print("Doing undo")
+		//		})
+		//
+		//		let selectedRange = textView.selectedRange
+		//		textView.selectedRange = NSRange()
+		//		textView.selectedRange = selectedRange
+		textView.textAlignment = switch self.parent.alignment {
+		case .leading: .left
+		case .center: .center
+		case .trailing: .right
 		}
 	}
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-//	func textViewDidBeginEditing(_ textView: UITextView) {
-//		if textView.attributedText.string == parent.placeholder {
-//			textView.attributedText = NSAttributedString(string: "")
-//			textView.typingAttributes[.foregroundColor] = UIColor.label
-//		}
-//		textView.undoManager?.registerUndo(withTarget: self, handler: { targetSelf in
-//			print("Doing undo")
-//		})
-//		
-//		let selectedRange = textView.selectedRange
-//		textView.selectedRange = NSRange()
-//		textView.selectedRange = selectedRange
-//	}
-//	
-//	func textViewDidEndEditing(_ textView: UITextView) {
-//		if textView.attributedText.string == "" || textView.attributedText.string == parent.placeholder {
-//			textView.attributedText = NSAttributedString(string: parent.placeholder)
-//		} else {
-//			parent.onCommit(textView.attributedText)
-//		}
-//		UITextView.appearance().tintColor = .tintColor
-//	}
-	
-//	func textViewDidChange(_ textView: UITextView) {
-//		
-//		if textView.attributedText.string != parent.placeholder {
-//			self.parent.attributedText = textView.attributedText.uiFontAttributedString
-//		}
-//		
-//		textViewDidChangeSelection(textView)
-//	}
-//
-//}
-

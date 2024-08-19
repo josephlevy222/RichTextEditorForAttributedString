@@ -8,6 +8,7 @@ import SwiftUI
 
 struct RichTextEditor: UIViewRepresentable {
 	@Binding var attributedText: AttributedString
+	@Binding var alignment: TextAlignment
 	@State private var toolbar = KeyboardToolbar(textView: RichTextView())
 	var textView: RichTextView { toolbar.textView } // created with toolbar above
 	
@@ -20,7 +21,8 @@ struct RichTextEditor: UIViewRepresentable {
 		textView.isEditable = true
 		textView.textColor = .label
 		textView.backgroundColor = .clear
-		
+		textView.textAlignment = switch alignment {case .leading: .left; case .center: .center; case .trailing: .right}
+		textView.typingAttributes[.font] = UIFont.preferredFont(forTextStyle: .body)
 		let accessoryViewController = UIHostingController(rootView: textView.accessoryView)
 		textView.inputAccessoryView = {
 			let accessoryView = accessoryViewController.view
@@ -34,8 +36,9 @@ struct RichTextEditor: UIViewRepresentable {
 	}
 	
 	func updateUIView(_ uiView: UITextView, context: Context) {
-			uiView.textStorage.setAttributedString(attributedText.nsAttributedString())
-			print("update UITextView")
+		uiView.textStorage.setAttributedString(attributedText.nsAttributedString())
+		uiView.textAlignment = switch alignment {case .leading: .left; case .center: .center; case .trailing: .right}
+		print("update UITextView")
 	}
 	
 	func makeCoordinator() -> Coordinator {
@@ -44,13 +47,17 @@ struct RichTextEditor: UIViewRepresentable {
 	
 	class Coordinator: NSObject, UITextViewDelegate {
 		var parent: RichTextEditor
+		
 		init(_ parent: RichTextEditor) {
 			self.parent = parent
 		}
 		
 		func textViewDidChange(_ textView: UITextView) {
-			parent.attributedText =  textView.attributedText.attributedStringFromUIKit
+//			if textView.attributedText.string != parent.placeholder {
+				parent.attributedText =  textView.attributedText.attributedStringFromUIKit
+//			}
 			print("text did change")
+			parent.alignment = textView.textAlignment.textAlignment
 		}
 	}
 }
